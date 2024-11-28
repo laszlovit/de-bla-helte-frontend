@@ -8,5 +8,6 @@ export type User = {
 
 export const INTENTS = {
 	insertUser: "insertUser" as const,
+	updateUser: "updateUser" as const,
 	deleteUser: "deleteUser" as const,
 };

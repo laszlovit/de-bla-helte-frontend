@@ -1,10 +1,4 @@
-import {
-	ActionFunctionArgs,
-	ClientLoaderFunctionArgs,
-	LoaderFunctionArgs,
-	useFetcher,
-	useLoaderData,
-} from "react-router";
+import { ActionFunctionArgs, Form, LoaderFunctionArgs, useLoaderData } from "react-router";
 import { getAllUsers } from "../queries/users/get-all-users";
 import { Heading } from "~/components/ui/heading";
 import { Input, InputGroup } from "~/components/ui/input";
@@ -38,6 +32,7 @@ import { Dropdown, DropdownButton, DropdownItem, DropdownMenu } from "~/componen
 import { Alert, AlertTitle, AlertDescription, AlertActions } from "~/components/ui/alert";
 import { deleteUser } from "../queries/users/delete-user";
 import { badRequest } from "~/http/bad-request";
+import { updateUser } from "../queries/users/update-user";
 
 export async function loader({ request }: LoaderFunctionArgs) {
 	const currentUser = await getCurrentUser({ request });
@@ -61,6 +56,13 @@ export async function action({ request }: ActionFunctionArgs) {
 			await insertUser({ token, name, email, password, role_name });
 			return { ok: true };
 		}
+		case INTENTS.updateUser: {
+			let userId = formData.get("userId");
+			let name = String(formData.get("name") || "");
+			let role_name = String(formData.get("role_name") || "");
+			await updateUser({ token, id: Number(userId), name, role_name });
+			return { ok: true };
+		}
 		case INTENTS.deleteUser: {
 			let userId = formData.get("userId");
 			if (!userId) throw badRequest("Missing userId");
@@ -73,7 +75,7 @@ export async function action({ request }: ActionFunctionArgs) {
 	}
 }
 
-function TableDropDown({ id }: { id: number }) {
+function TableDropDown({ id, name, role }: { id: number; name: string; role: string }) {
 	let [isDeleteUserOpen, setIsDeletUserDownOpen] = useState(false);
 	let [isUpdateUserOpen, setIsUpdateUserOpen] = useState(false);
 	let [isUpdatePasswordOpen, setIsUpdatePasswordOpen] = useState(false);
@@ -108,19 +110,41 @@ function TableDropDown({ id }: { id: number }) {
 					</Button>
 				</AlertActions>
 			</Alert>
-			{/* <Dialog open={isUpdisUpdateUserOpenateOpen} onClose={setIsUpdateOpen}>
-				<UpdateUserForm id={id} name={username} role={role}>
+			<Dialog open={isUpdateUserOpen} onClose={setIsUpdateUserOpen}>
+				<Form method="patch">
+					<DialogTitle>Update user</DialogTitle>
+					<DialogDescription>
+						Enter the user&apos;s name, email, and role to update a current user.
+					</DialogDescription>
+					<DialogBody>
+						<FieldGroup>
+							<input type="hidden" name="intent" value={INTENTS.updateUser} />
+							<input type="hidden" name="userId" value={id} />
+							<Field>
+								<Label>Name</Label>
+								<Input name="name" type="string" defaultValue={name} />
+							</Field>
+
+							<Field>
+								<Label>Role</Label>
+								<Select name="role_name" defaultValue={role}>
+									<option value="editor">Editor</option>
+									<option value="admin">Admin</option>
+								</Select>
+							</Field>
+						</FieldGroup>
+					</DialogBody>
 					<DialogActions>
-						<Button plain onClick={() => setIsUpdateOpen(false)}>
+						<Button plain onClick={() => setIsUpdateUserOpen(false)}>
 							Cancel
 						</Button>
-						<Button onClick={() => setIsUpdateOpen(false)} type="submit">
+						<Button onClick={() => setIsUpdateUserOpen(false)} type="submit">
 							Update
 						</Button>
 					</DialogActions>
-				</UpdateUserForm>
+				</Form>
 			</Dialog>
-			<Dialog open={isUpdatePasswordOpen} onClose={setIsUpdatePasswordOpen}>
+			{/* <Dialog open={isUpdatePasswordOpen} onClose={setIsUpdatePasswordOpen}>
 				<UpdateUserPasswordForm id={id}>
 					<DialogActions>
 						<Button plain onClick={() => setIsUpdatePasswordOpen(false)}>
@@ -131,17 +155,17 @@ function TableDropDown({ id }: { id: number }) {
 						</Button>
 					</DialogActions>
 				</UpdateUserPasswordForm>
-			</Dialog> */}
+			</Dialog>  */}
 		</>
 	);
 }
 
-function InsertFormDialog() {
+function InsertUserDialog() {
 	let [isInsertModalOpen, setIsInsertModalOpen] = useState(false);
 
 	return (
 		<>
-			<Button onClick={() => setIsInsertModalOpen(true)}>Create</Button>
+			<Button onClick={() => setIsInsertModalOpen(true)}>Create user</Button>
 			<Dialog open={isInsertModalOpen} onClose={setIsInsertModalOpen}>
 				<form method="post">
 					<DialogTitle>Create user</DialogTitle>
@@ -149,30 +173,28 @@ function InsertFormDialog() {
 						Enter the user&apos;s name, email, and role to create a new user.
 					</DialogDescription>
 					<DialogBody>
-						<Fieldset>
-							<FieldGroup>
-								<input type="hidden" name="intent" value={INTENTS.insertUser} />
-								<Field>
-									<Label>Name</Label>
-									<Input name="name" type="string" required />
-								</Field>
-								<Field>
-									<Label>Email</Label>
-									<Input name="email" type="email" required />
-								</Field>
-								<Field>
-									<Label>Password</Label>
-									<Input name="password" type="password" required />
-								</Field>
-								<Field>
-									<Label>Role</Label>
-									<Select name="role_name">
-										<option value="editor">Editor</option>
-										<option value="admin">Admin</option>
-									</Select>
-								</Field>
-							</FieldGroup>
-						</Fieldset>
+						<FieldGroup>
+							<input type="hidden" name="intent" value={INTENTS.insertUser} />
+							<Field>
+								<Label>Name</Label>
+								<Input name="name" type="string" required />
+							</Field>
+							<Field>
+								<Label>Email</Label>
+								<Input name="email" type="email" required />
+							</Field>
+							<Field>
+								<Label>Password</Label>
+								<Input name="password" type="password" required />
+							</Field>
+							<Field>
+								<Label>Role</Label>
+								<Select name="role_name">
+									<option value="editor">Editor</option>
+									<option value="admin">Admin</option>
+								</Select>
+							</Field>
+						</FieldGroup>
 					</DialogBody>
 					<DialogActions>
 						<Button plain onClick={() => setIsInsertModalOpen(false)}>
@@ -217,7 +239,7 @@ export default function DashboardUsers() {
 						</div>
 					</div>
 				</div>
-				{hasUsersWritePermission && <InsertFormDialog />}
+				{hasUsersWritePermission && <InsertUserDialog />}
 			</div>
 			<Table className="mt-8 [--gutter:theme(spacing.6)] lg:[--gutter:theme(spacing.10)]">
 				<TableHead>
@@ -254,7 +276,7 @@ export default function DashboardUsers() {
 								</TableCell>
 								{hasUsersWritePermission && (
 									<TableCell className="text-right">
-										<TableDropDown id={user.id} />
+										<TableDropDown id={user.id} name={user.name} role={user.role_name} />
 									</TableCell>
 								)}
 							</TableRow>
